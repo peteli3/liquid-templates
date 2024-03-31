@@ -1,0 +1,240 @@
+{% comment %}
+/sections/image-row.liquid
+author: peteli3
+{% endcomment %}
+
+{% style %}
+  .image-row-container {
+    position: relative;
+    margin-bottom: 30px;
+  }
+
+  .image-row {
+    display: flex;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    scroll-padding-left: 0px;
+    -webkit-overflow-scrolling: touch;
+    gap: {{ section.settings.grid_gap }}px;
+    scrollbar-width: none; /* Firefox */
+    -ms-overflow-style: none; /* Internet Explorer and Edge */
+  }
+
+  .image-row::-webkit-scrollbar {
+    display: none; /* Chrome, Safari, and Opera */
+  }
+
+  .image-row img {
+    flex: 0 0 auto;
+    width: auto;
+    height: {{ section.settings.row_height }}px;
+    scroll-snap-align: center;
+    object-fit: contain;
+    object-position: center;
+  }
+
+  @media screen and (max-width: 768px) {
+    .image-row img {
+      height: {{ section.settings.row_height | times: 0.50 }}px;
+    }
+  }
+
+  .button-container {
+    position: absolute;
+    top: 50%;
+    left: 0;
+    right: 0;
+    transform: translateY(-50%);
+    display: flex;
+    justify-content: space-between;
+    padding: 0 20px;
+    pointer-events: none;
+  }
+
+  .text-button {
+    background-color: #fff;
+    border: none;
+    font-size: 32px;
+    color: #000;
+    cursor: pointer;
+    outline: none;
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background-color 0.3s ease;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    pointer-events: auto;
+  }
+
+  .text-button:hover {
+    background-color: #f5f5f5;
+  }
+
+  #leftScroll {
+    position: absolute;
+    left: 15%;
+  }
+
+  #rightScroll {
+    position: absolute;
+    right: 15%;
+  }
+{% endstyle %}
+
+{% javascript %}
+  const imageRow = document.querySelector('.image-row');
+  const images = imageRow.querySelectorAll('img');
+
+  // Duplicate images for infinite scroll effect
+  images.forEach(image => {
+    imageRow.appendChild(image.cloneNode(true));
+  });
+
+  // Set starting point at halfway in
+  const setStartingPoint = () => {
+    imageRow.scrollLeft = imageRow.children[images.length-1].offsetLeft;
+  };
+  imageRow.children[images.length-1].addEventListener('load', setStartingPoint);
+
+  // Mouse drag functionality
+  let isDown = false;
+  let startX;
+  let scrollLeft;
+
+  const startDrag = (e) => {
+    isDown = true;
+    imageRow.classList.add('active');
+    startX = e.pageX - imageRow.offsetLeft;
+    scrollLeft = imageRow.scrollLeft;
+  };
+
+  const stopDrag = () => {
+    isDown = false;
+    imageRow.classList.remove('active');
+  };
+
+  const handleDrag = (e) => {
+    if (!isDown) return;
+    e.preventDefault();
+    const x = e.pageX - imageRow.offsetLeft;
+    const walk = (x - startX) * 3;
+    imageRow.scrollLeft = scrollLeft - walk;
+  };
+
+  imageRow.addEventListener('mousedown', startDrag);
+  imageRow.addEventListener('mouseleave', stopDrag);
+  imageRow.addEventListener('mouseup', stopDrag);
+  imageRow.addEventListener('mousemove', handleDrag);
+
+  // Scroll button functionality
+  const leftScrollButton = document.getElementById("leftScroll");
+  const rightScrollButton = document.getElementById("rightScroll");
+
+  const rollLeft = () => {
+    const last = imageRow.lastElementChild.cloneNode(true);
+    imageRow.prepend(last);
+    imageRow.lastElementChild.remove();
+  };
+
+  const rollRight = () => {
+    const first = imageRow.firstElementChild.cloneNode(true);
+    imageRow.appendChild(first);
+    imageRow.firstElementChild.remove();
+  };
+
+  const scrollOver = (itemWidth, direction) => {
+    const targetPosition = imageRow.scrollLeft + (direction * itemWidth);
+    imageRow.scrollTo({
+      left: targetPosition,
+      behavior: 'smooth'
+    });
+  };
+
+  leftScrollButton.onclick = () => {
+    rollLeft();
+    // TODO can we prevent skipping for when first child is really wide?
+    scrollOver(imageRow.firstElementChild.offsetWidth, -1);
+  };
+
+  rightScrollButton.onclick = () => {
+    rollRight();
+    // TODO can we prevent skipping for when first child is really wide?
+    scrollOver(imageRow.firstElementChild.offsetWidth, 1);
+  };
+{% endjavascript %}
+
+<html>
+  {%- if section.settings.heading != blank -%}
+    <div class="page-width">{{ section.settings.heading }}</div>
+  {%- endif -%}
+
+  <div class="image-row-container">
+    <div class="image-row page-width">
+      {% if section.blocks.size > 0 %}
+        {% for block in section.blocks %}
+          {%- assign image = block.settings.image -%}
+          <img src="{{ image | img_url: '800x800' }}" alt="{{ image.alt }}" loading="lazy">
+        {% endfor %}
+      {% else %}
+        <p>No images have been added yet.</p>
+      {% endif %}
+    </div>
+    <div class="button-container">
+      <button class="text-button" id="leftScroll">&#8249;</button>
+      <button class="text-button" id="rightScroll">&#8250;</button>
+    </div>
+  </div>
+</html>
+
+{% schema %}
+{
+  "name": "Image Row",
+  "settings": [
+    {
+      "type":"richtext",
+      "id":"heading",
+      "label":"Heading",
+      "default":"<h2>Image Row</h2>"
+    },
+    {
+      "type": "range",
+      "id": "grid_gap",
+      "label": "Grid gap",
+      "min": 0,
+      "max": 50,
+      "step": 1,
+      "default": 10
+    },
+    {
+      "type": "range",
+      "id": "row_height",
+      "label": "Row height",
+      "min": 300,
+      "max": 800,
+      "step": 10,
+      "default": 600
+    }
+  ],
+  "blocks":[
+    {
+      "type":"image",
+      "name":"Image",
+      "settings":[
+        {
+          "type":"image_picker",
+          "id":"image",
+          "label":"Image"
+        }
+      ]
+    }
+  ],
+  "presets": [
+    {
+      "name": "Image Row"
+    }
+  ]
+}
+{% endschema %}
